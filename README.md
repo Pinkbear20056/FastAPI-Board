@@ -1,5 +1,10 @@
 # Board-with-FastAPI
-Building a board with FastAPI
+### 설명
+FastAPI를 사용해 CRUD를 만족하는 게시판을 만들기
+- Create: 게시글 작성
+- Read: 게시글 조회 / 검색
+- Upadate: 게시글 수정
+- Delete: 게시글 삭제
 
 ### 설치 순서
 
@@ -41,7 +46,7 @@ python-jose[cryptography]    # JWT 토큰 생성/검증
 > `[standard]`, `[cryptography]`는 "추가 기능도 함께 설치해라"라는 뜻입니다.
 
 
-## 4. 서버 실행 확인
+### 서버 실행 확인
 
 ```bash
 uvicorn app.main:app --reload

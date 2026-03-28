@@ -1,0 +1,7 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+pydantic[email]              # EmailStr 이메일 형식 검증
+bcrypt
+python-jose[cryptography]
+sqlite-web                   # SQLite DB를 웹 브라우저에서 조회/SQL 실행

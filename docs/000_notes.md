@@ -121,3 +121,15 @@ pycache가 이미 올라가 있을 때 삭제 방법
 ```bash
 git rm -r --cached __pycache__
 ```
+
+### 구조
+```
+│   └── post/                  # 게시글 도메인
+│       ├── __init__.py
+│       ├── model.py
+│       ├── schema.py
+│       ├── repository.py
+│       ├── service.py
+│       └── router.py
+```
+3 tier architecture

@@ -12,7 +12,7 @@ User CRUD와 로그인 CRUD 이미 존재하는 상태에서 **게시판만을**
 
 ```bash
 # 1. 프로젝트 폴더로 이동
-cd Board-with-FastAPI
+cd FastAPI-Board
 
 # 2. 가상환경 생성
 #    python -m venv venv

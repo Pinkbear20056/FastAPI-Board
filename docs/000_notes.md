@@ -329,6 +329,38 @@ def get_user():
 ### ORM 연동이 뭐냐? - 간단하게 필기만 해봄.
 DB 모델(SQLAlchemy 객체)을 Schema(BaseModel)로 변환하는 것
 
+## 4/2 목 - post_schema.py 와 post의 3-tier architecture 만들기
+### post_schema.py 만들기
+#### 특징
+model에 있는 데이터를 기반으로 schema를 만듦.
+-> DB(여기서는 model)에 없는 데이터는 저장하거나 조회할 수 없기 때문
+
+### model_config = {"from_attributes": True} 란??
+#### 필요한 상황
+ORM 객체(SQLAlchemy)를 → schema(BaseModel)로 변환할 때 필요
+- ORM: DB를 파이썬 객체처럼 다루게 해주는 도구
+
+### Base vs Basemodel 차이
+- Base: DB에 어떻게 저장할까?
+- BaseModel: 사용자에게 무엇을 보여줄까?
+
+### FastAPI의 역할
+```
+<요청할 때>
+클라이언트 JSON
+→ FastAPI
+→ BaseModel
+→ 개발자가 ORM 객체 생성
+→ DB 저장
+
+<응답할 때>
+DB
+→ ORM 객체
+→ FastAPI
+→ BaseModel
+→ JSON 응답
+```
+
 ### 3 tier architecture란? 
 1. 라우터 Router
 2. 서비스 Service

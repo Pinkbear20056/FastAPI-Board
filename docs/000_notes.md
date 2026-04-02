@@ -163,6 +163,73 @@ git rm -r --cached __pycache__
 예) 요청 body에 어떤 값이 들어와야 하는지
 라우터: 어떤 URL로 요청이 왔을 때 어떤 함수를 실행할지2
 
+## 4/1 수 - model.py 만들기
+#### 1. 모델
+- SQLAlchemy로 만듦
+- 데이터베이스 테이블의 정의
+- 실제 저장 구조 
+```python
+from sqlalchemy import Column, Integer, String
+from database import Base
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String)
+    email = Column(String)
+```
+SQLlite: 간단한 데이터베이스
+SQLAlchemy: DB를 파이썬 코드로 다루게 해주는 라이브러리
+Base:
+```python
+from sqlalchemy.orm import sessionmaker, declarative_base
+# SQLAlchemy의 기능 가져오기
+Base = declarative_base()
+# 중요!! 모든 모델의 기준(Base) 생성
+
+# user/model.py
+class User(Base):
+# post/model.py
+class Post(Base):
+# 이렇게 각각 DB 테이블 구조가 하나에 추가됨
+```
+- 흐름
+      1. Base 생성
+      2. 모델 정의 (User, Post)
+      3. create_all() 실행
+      4. DB에 테이블 생성됨
+
+파이썬에서 클래스와 테이블 이름은 겹치면 안됨
+Column(데이터타입, 옵션1, 옵션2, ...)
+
+1. primary_key: 각 행을 유일하게 구분하는 키
+```
+id | name   | email
+------------------------
+1  | 김철수 | a@test.com
+2  | 이영희 | b@test.com
+3  | 김철수 | c@test.com
+```
+name은 겹칠 수 있지만 id는 겹치면 안됨 이런거
+
+2. Nullable: NULL 허용 여부
+3. unique: 중복 허용 안함
+4. index: 검색 속도 빠르게 하는 옵션 (자주 조회하는 칼럼)
+- 기본 =  false
+5. default: python에 값 생성
+6. server_default: db에 값 생성
+      - ```server_default=func.now()``` 
+      - 값을 안 넣으면 DB가 자동으로 현재 시간 넣어라
+      - DB 기준이라 안정성이 높음
+7. onupdate: 데이터 수정 시 자동실행
+      - ```updated_at = Column(DateTime, onupdate=func.now())```
+      - 처음 생성 → created_at 저장
+      - 수정됨 → updated_at 자동 변경
+
+
+##### 2. 스키마
+
 
 #### 3 tier architecture란? 
 1. 라우터 Router

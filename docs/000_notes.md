@@ -361,10 +361,437 @@ DB
 → JSON 응답
 ```
 
+## 4/3 금 - 3티어 아키텍쳐 만들기 1차
+
 ### 3 tier architecture란? 
 1. 라우터 Router
 2. 서비스 Service
 3. 리포지토리 Repository
 
+### REST API란?
+Create - POST       생성
+Read - GET          조회
+Update - PUT PATCH  수정
+Delete - DELETE     삭제
+
+## 4/6 월 - 3티어 아키텍쳐 이해하기, 3티어 없이 만들기, 3티어로 나누기
+### 내가 3티어 아키텍쳐 부분 코딩을 시작하기 어려웠을까?
+#### 0. restapi 즉 get post 등등 먼지 몰랐음 
+-> 공부함, 바로 위에 있음
+#### 1. from 어쩌고저쩌고 import를 멀 해야할 지 몰랐음
+#### 2.  `router = APIRouter(prefix="/api/v1/users", tags=["Users"])` 먼말인지 몰랐음 하지만 중요해보임
+```python
+router = APIRouter(prefix="/api/v1/users", tags=["Users"])
+```
+- APIRouter: API들을 묶는 미니 서버
+    - 여러 endpoint들을 하나로 묶어서 관리 (user 관련 API, auth 관련 API) 
+    - 즉, 여기선 "유저 관련 API 묶음"을 하나 만듦
+- prefix: 모든 URL 앞에 자동으로 붙는 경로
+- tags=["Users"] : Swagger 문서에서 그룹 이름
+
+#### 3. fastapi 코드를 아키텍쳐 없이도 어떻게 작성해야 하는 지 모르겠음.
+모르겠는 것들: fastapi 코드의 큰 틀, 왜 함수를 쓰는 지, 매개 변수들이 먼지, 비즈니스 로직을 어떻게 작성해야하는 지 무슨 문법을 쓰는 지 몰랐음. 그리고 db 연결 문법이랑 어떻게 하는 지 방식을 몰랐음.
+##### 분석할 코드 
+```python
+@router.post("", response_model=UserResponse, status_code=201)
+def create_user(user_in: UserCreate, db: Session = Depends(get_db)):
+    """유저 생성"""
+    existing = db.query(User).filter(User.email == user_in.email).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="이미 존재하는 이메일입니다.")
+
+    user = User(
+        name=user_in.name,
+        email=user_in.email,
+        password=user_in.password,
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+```
+##### fastapi 코드의 큰 틀 
+순서
+1. 요청 받기
+2. 데이터 확인하기  ← (지금 질문)
+3. DB에 저장하기
+4. 결과 반환하기
+
+##### 왜 함수를 쓰는 지, 매개 변수들이 먼 지
+클라이언트가 유저 생성 요청을 보내면, DB에 유저를 저장하고 그 결과를 돌려주는 API
+- API: 요청 보내면 → 응답을 주는 규칙
+```python
+@router.post("")
+def create_user(...):
+```
+- 클라이언트가 요청을 보내면, 서버가 응답을 주는 통로
+    - 클라이언트(프론트)가 URL로 "요청을 보내고", 그 요청 안에 JSON 데이터를 담아서 서버로 보냄.
+    - 어디로 보낼지 -> URL + 요청 방식
+    ```http
+    POST /api/v1/users
+    ```
+    - 무엇을 보낼지
+    ```JSON
+    {
+  "name": "kim",
+  "email": "kim@test.com",
+  "password": "1234"
+    }
+    ```
+    - 즉, from 클라이언트 to 서버 : “/api/v1/users 주소로 POST 요청을 이 데이터와 같이 보낼게
+
+---
+
+```python
+@router.post("", response_model=UserResponse, status_code=201)
+```
+- 코드 설명: /api/v1/users로 POST 요청이 들어오면 실행되는 함수
+    - ()안에 -> 경로, 응답 형식, 성공 시 상태코드 201 반환
+
+--- 
+
+```python
+def create_user(user_in: UserCreate, db: Session = Depends(get_db)):
+```
+- 코드 설명: 실제로 요청이 들어왔을 때 실행되는 처리 로직
+    - FastAPI에서는 함수 매개변수에 따라 이 값은 어디서 가져와야 하는 지를 자동으로 판단함.
+    - `user_in: UserCreate`: 클라이언트가 보낸 요청 body를 의미함.
+    - `Usercreate`
+    ```python
+    class UserCreate(BaseModel):
+        name: str
+        email: str
+        password: str
+    ```
+    - 이러면 FastAPI가 이 JSON을 읽어서 UserCreate 스키마에 맞게 검사한 뒤 `user_in`에 넣어줌
+    ```python
+    user_in.name
+    user_in.email
+    user_in.password
+    ```
+    - `db: Session = Depends(get_db)`: DB 세션을 주입받는 것
+        - 이 함수 실행 전에 get_db()를 실행해서 DB 연결 객체를 db에 넣어줘 = 이 함수 안에서 DB를 쓰고 싶으니까, get_db()를 통해 DB 연결 객체를 가져와라
+        ```python
+        def get_db():
+            db = SessionLocal()   # DB 연결 생성
+            try:
+                yield db          # 여기서 API 함수로 넘김
+            finally:
+                db.close()        # 사용 끝나면 닫기,함수 끝나고 실행됨
+        ```
+        - API 실행 중에는 db 사용 가능하고 끝나면 자동으로 닫힘
+        - `db: Session = Depends(get_db)`의 FastAPI식 해석
+            1. get_db() 실행
+            2. db 객체 받아오기
+            3. create_user 함수에 넣어주기
+            - 내부적으로는 FastAPI에 대신 해주는 일
+            ```python
+            db = get_db()  # (실제로는 yield 구조)
+            create_user(user_in, db)
+            ```
+            - FastAPI가 자동으로 이렇게 실행해줌. -> 우리는 함수 정의만 하고, 실행은 FastAPI가 함. 
+            ```python
+            create_user(
+                user_in=요청에서 받은 데이터,
+                db=Depends(get_db)로 만든 DB 객체
+            )
+            ```
+            - `create_user`는 FastAPI가 대신 호출하고, 요청이 오면 자동 실행되는 함수
+        - db를 모든 함수가 공유하는 게 아니라고???
+            - 절대 공유하지 않음!!! -> 요청마다 새로운 db가 만들어짐.
+        - db 객체 (Session)
+            - `db: Session`
+            - DB에 접근하기 위한 "통로", 일종의 "연결 객체"
+        - 실제 DB (SQLlite)
+            - 데이터가 실제로 저장되는 장소
+            - 파일 or 서버
+            - 예) sql_app.db  ← SQLite 파일
+            ```md
+            <요청1>
+            get_db() → db1 생성
+            db1 → SQLite 접근
+            데이터 저장
+            db1.close()
+
+            <요청2>
+            get_db() → db2 생성
+            db2 → SQLite 접근
+            데이터 저장
+            db2.close()
+
+                [SQLite DB 파일]
+                     ↑
+            ┌────────┼────────┐
+            │        │        │
+            db1      db2      db3
+            ↑        ↑        ↑
+            요청1     요청2     요청3
+            ```
+            - db1 ≠ db2, 하지만 둘 다 같은 SQLite 파일을 사용
+            - db(Session)는 “접속 객체”이고 SQLite는 “실제 데이터 저장소”입니다
+            - db 객체: 요청마다 새로 생성됨, 서로 공유 안 함
+            - SQLite: 하나, 모든 db 객체가 여기에 연결됨
+
+        - Dependency 의존성
+            - ❌ Depends 없이 - 모든 사람이 같은 계좌 공유 → 위험
+            - ✅ Depends 사용 - 요청마다: 계좌 열고 거래하고 닫기
+            - `Depends(get_db)`: 요청마다 DB 연결을 안전하게 주입해주는 시스템
+---
+```python
+existing = db.query(User).filter(User.email == user_in.email).first()
+```
+코드 설명: 중복 이메일 확인
+- `user_in`: FastAPI가 요청(JSON)을 Python 객체로 바꾼 것
+    - `def create_user(user_in: UserCreate, db: Session = Depends(get_db)):`에서
+        1. 클라이언트가 서버에 JSON 보냄
+        ```JSON
+        {
+            "name": "kim",
+            "email": "kim@test.com",
+            "password": "1234"
+        }
+        ```
+        2. FastAPI가 자동으로 
+        ```python
+        user_in = UserCreate(
+            name="kim",
+            email="kim@test.com",
+            password="1234"
+        )
+        ```
+- `db.query(User)`: User 테이블을 조회할 준비
+    - SQLAlchemy ORM 문법
+    - db = DB 연결(Session)
+    - query = `User`조회 시작
+- `filter(User.email == user_in.email)` 
+    - 여기까지 공부했음 컴공이라면 이해 가능..
+- `first()`: 결과 중 “첫 번째 하나만 가져오기”
+    - first() 쓰면
+        - 있으면 → 객체 하나
+        - 없으면 → None
+
+- `existing = db.query(User).filter(User.email == user_in.email).first()` 전체 흐름
+    - 실제로 SQL 문법 - 왜냠 DB에 접근하는 데 DB는 SQL 문법이라서
+    ``` SQL
+    SELECT * FROM users
+    WHERE email = 'kim@test.com'
+    LIMIT 1;
+    ```
+    - 실제 흐름
+    ```
+    Python 코드 작성
+        ↓
+    SQLAlchemy가 SQL로 변환
+        ↓
+    SQLite(DB)에 전달
+        ↓
+    DB가 실행
+        ↓
+    결과 반환 ---- (1, "kim", "kim@test.com")
+        ↓
+    Python 객체로 다시 변환 --- User(id=1, name="kim", email="kim@test.com")
+    ```
+    - ORM의 역할
+        ```
+        너: "유저 가져와"
+            ↓
+        ORM: "SELECT * FROM users"
+            ↓
+        DB 실행
+            ↓
+        ORM: 결과를 다시 Python 객체로 번역
+        ```
+        - ORM: DB(테이블)를 파이썬 객체처럼 다루게 해주는 방식
+        - SQLAlchemy: Python에서 ORM을 사용할 수 있게 해주는 도구(라이브러리)
+---
+```python
+if existing:
+        raise HTTPException(status_code=400, detail="이미 존재하는 이메일입니다.")
+```
+코드 설명: 이미 있는 이메일이면 에러 발생 
+
+---
+```python
+    user = User(
+        name=user_in.name,
+        email=user_in.email,
+        password=user_in.password,
+    )
+```
+코드 설명: 새 User 객체 만들기
+- User는 보통 SQLAlchemy 모델
+- DB 테이블에 넣을 ORM 객체 만드는 것
+    - `user_in`은 요청 데이터용 스키마
+    -  `User(...)`는 DB 저장용 모델
+- 클라이언트가 보낸 데이터는 UserCreate
+- DB에 넣을 객체는 User
+
+---
+```python
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+```
+코드 설명
+- `db.add(user)`: 새로 만든 user 객체를 DB 세션에 올리는 것
+    - 진짜 DB에 저장이 완료된 건 아님
+    - 저장할 준비 목록에 올려둠
+- `db.commit()`: 이제 진짜 DB에 반영
+- `db.refresh(user)`: DB에 저장된 뒤의 최신 상태를 다시 객체에 반영
+    - 예시
+    ```python
+    # 저장 전
+    user.name = "kim"
+    user.email = "kim@example.com"
+    user.id = 없음
+
+    # 저장 후 refresh
+    user.id = 1
+    user.name = "kim"
+    user.email = "kim@example.com"
+    ```
+
+---
+```python
+return user
+```
+코드 설명: 이걸 반환하면 FastAPI가 response_model=UserResponse에 맞춰서 위에서 db.refresh(user)가 반영된 응답을 만들어줌
+- 예) 
+```python
+class UserResponse(BaseModel):
+    id: int
+    name: str
+    email: str
+```
+```JSON
+{
+  "id": 1,
+  "name": "kim",
+  "email": "kim@example.com"
+}
+```
+!!! 이때, 비밀번호는 UserResponse에 없으면 응답에 안 나감!
+=> 보통 password는 응답 스키마에 넣지 않음
 
 
+###### 추가1 - user_in vs User(...) 차이
+- `def create_user(user_in: UserCreate):` 이 줄로 인해 JSON이 파이썬 객체로 바뀜
+```JSON
+{
+  "name": "kim",
+  "email": "kim@test.com",
+  "password": "1234"
+}
+```
+```python
+user_in = UserCreate(
+    name="kim",
+    email="kim@test.com",
+    password="1234"
+)
+```
+- 그리고 이 코드는 DB에 저장될 구조임, SQLAlchemy ORM 객체
+```python
+    user = User(
+        name=user_in.name,
+        email=user_in.email,
+        password=user_in.password,
+    )
+```
+- User <-> users 테이블
+- DB에 넣을 객체임
+- `User`란 이름: 개발자가 `user_model.py`에서 정한 파이썬 클래스 이름.
+- `users`란 이름: 실제 DB 테이블 이름
+```python
+class User(Base):
+    __tablename__ = "users"
+```
+- User는 코드용 이름이고, 실제 DB 이름은 __tablename__으로 따로 정함!!
+
+###### 추가2 - commit vs refresh
+- commit: DB 저장
+- refresh: “DB가 만든 값”을 다시 가져오는 역할
+- 필요한 경우
+    - 경우 1: 필요함
+        - id 자동 생성, timestamp 자동 생성,default 값 있음
+        - refresh 필요
+
+    - 경우 2: 필요 없음
+        - 모든 값 직접 넣음, DB에서 자동 생성 없음
+        -  refresh 없어도 됨
+
+
+#### 4. 어떻게 나눠야 하는 지 몰랐음 
+
+
+### 참고한 코드 - 3티어 아키텍쳐 존재하지 않음
+```python
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+
+from app.database import get_db
+from app.models import User
+from app.schemas import UserCreate, UserUpdate, UserResponse
+
+router = APIRouter(prefix="/api/v1/users", tags=["Users"])
+
+@router.post("", response_model=UserResponse, status_code=201)
+def create_user(user_in: UserCreate, db: Session = Depends(get_db)):
+    """유저 생성"""
+    existing = db.query(User).filter(User.email == user_in.email).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="이미 존재하는 이메일입니다.")
+
+    user = User(
+        name=user_in.name,
+        email=user_in.email,
+        password=user_in.password,
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+@router.get("", response_model=list[UserResponse])
+def get_users(db: Session = Depends(get_db)):
+    """전체 유저 조회"""
+    return db.query(User).all()
+
+
+@router.get("/{user_id}", response_model=UserResponse)
+def get_user(user_id: int, db: Session = Depends(get_db)):
+    """단건 유저 조회"""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="유저를 찾을 수 없습니다.")
+    return user
+
+
+@router.put("/{user_id}", response_model=UserResponse)
+def update_user(user_id: int, user_in: UserUpdate, db: Session = Depends(get_db)):
+    """유저 수정"""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="유저를 찾을 수 없습니다.")
+
+    if user_in.name is not None:
+        user.name = user_in.name
+    if user_in.email is not None:
+        user.email = user_in.email
+
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+@router.delete("/{user_id}", status_code=204)
+def delete_user(user_id: int, db: Session = Depends(get_db)):
+    """유저 삭제"""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="유저를 찾을 수 없습니다.")
+
+    db.delete(user)
+    db.commit()
+```

@@ -795,3 +795,47 @@ def delete_user(user_id: int, db: Session = Depends(get_db)):
     db.delete(user)
     db.commit()
 ```
+## 4/8 수 - 3티어 아키텍쳐 없는 버전, 있는 버전 만들기
+
+## 4/11 토 - 3티어 아키텍쳐 없는 버전, 있는 버전 만들기 2차
+```python
+# 단건 조회
+@router.get("/{post_id}", response_model=PostResponse)
+def get_post(post_id: int, db: Session = Depends(get_db))
+  post = db.query(Post).filter(Post.id == post_id).first()
+  if not post:
+    raise HTTPException(status_code=404, details="게시물을 찾을 수 없습니다.")
+  return post
+# user_in 은 작성자 혹은 게시글임
+```
+- post_id가 db와 연결이 되는 지 어케 앎?
+    - 아래 orm으로 db와 연결함.
+    - 위의 2줄까지의 이해: URL에 있는 post_id 값을 받아서 함수에 넣어라 
+- 전체 조회 함수 이름 get_posts vs 단건 조회 함수 이름 get_post
+- 작성자, 게시글 검색 내용은 어떻게 나타냄?
+
+```python
+  if user_in.title is not None: 
+    post.title = user_in.title
+  if user_in.content is not None:
+    post.content = user_in.content
+```
+- `user_in.` : 클라이언트에게 받은 값
+- `post.` : 내가 함수안에서 db에서 받아온 값, db와 연결된 값
+
+```python
+@router.delete("/{post_id}", status_code=204)
+def delete_post(post_id: int, db: Session = Depends(get_db)): #받는 정보는 id임
+  post = db.query(Post).filter(Post.id == post_id).first()
+  if not post: 
+    raise HTTPException(status_code=404, details="게시물을 찾을 수 없습니다.")
+  
+  db.delete(post)
+  db.commit
+```
+- 클라이언트에게 돌려주는 것에 `status_code=204`를 넣는 이유는?
+    - 204 No Content 의미
+        - 삭제 성공 
+        - 하지만 응답 바디는 없음 (return 없음)
+- db에서 불러온 post를 지우는 방법
+    - `db.delete(post)` 간단함.

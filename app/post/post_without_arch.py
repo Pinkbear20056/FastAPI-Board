@@ -29,10 +29,42 @@ def create_post(user_in: PostCreate, db: Session = Depends(get_db)): # 여기까
 # Read: 게시글 조회 - GET
 # 전체 유저 조회
 @router.get("", response_model=list[PostResponse])
-def get_post(db: Session = Depends(get_db)): #이 db 객체는 되돌려줄때 만듦??
+def get_posts(db: Session = Depends(get_db)): #이 db 객체는 되돌려줄때 만듦??
   return db.query(Post).all()
   
 # 단건 조회
+@router.get("/{post_id}", response_model=PostResponse)
+def get_post(post_id: int, db: Session = Depends(get_db)):
+  post = db.query(Post).filter(Post.id == post_id).first()
+  if not post:
+    raise HTTPException(status_code=404, details="게시물을 찾을 수 없습니다.")
+  return post
+# user_in 은 작성자 혹은 게시글임
+  
 
-# Upadate: 게시글 수정 - PUT
+# Upadate: 게시글 수정 - PUT, 제목과 내용만 가능
+@router.put("/{post_id}", response_model=PostResponse)
+def update_post(post_id: int, user_in: PostUpdate, db: Session = Depends(get_db)):
+  post = db.query(Post).filter(Post.id == post_id).first()
+  if not post:
+    raise HTTPException(status_code=404, details="게시물을 찾을 수 없습니다.")
+  
+  if user_in.title is not None: 
+    post.title = user_in.title
+  if user_in.content is not None:
+    post.content = user_in.content
+
+  db.commit()
+  db.refresh(post)
+  return post
+
 # Delete: 게시글 삭제 - DELETE
+# response_model 없음
+@router.delete("/{post_id}", status_code=204)
+def delete_post(post_id: int, db: Session = Depends(get_db)): #받는 정보는 id임
+  post = db.query(Post).filter(Post.id == post_id).first()
+  if not post: 
+    raise HTTPException(status_code=404, details="게시물을 찾을 수 없습니다.")
+  
+  db.delete(post)
+  db.commit

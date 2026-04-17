@@ -798,6 +798,7 @@ def delete_user(user_id: int, db: Session = Depends(get_db)):
 ## 4/8 수 - 3티어 아키텍쳐 없는 버전, 있는 버전 만들기
 
 ## 4/11 토 - 3티어 아키텍쳐 없는 버전, 있는 버전 만들기 2차
+### 3티어 아키텍쳐 없는 버전 하기
 ```python
 # 단건 조회
 @router.get("/{post_id}", response_model=PostResponse)
@@ -839,3 +840,229 @@ def delete_post(post_id: int, db: Session = Depends(get_db)): #받는 정보는 
         - 하지만 응답 바디는 없음 (return 없음)
 - db에서 불러온 post를 지우는 방법
     - `db.delete(post)` 간단함.
+
+### 3티어 아키텍쳐 없는 버전 Swagger UI로 확인하기
+확인 완료
+
+### 3티어 아키텍쳐 만들기
+#### 현재 코드 예시
+```python
+@router.post("", response_model=UserResponse, status_code=201)
+def create_user(request: UserCreate, db: Session = Depends(get_db)):
+    # 1. 비즈니스 로직: 이메일 중복 체크
+    existing = db.query(User).filter(User.email == request.email).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="이미 존재하는 이메일입니다.")
+
+    # 2. DB 접근: 유저 생성 및 저장
+    user = User(name=request.name, email=request.email, password=request.password)
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    # 3. 응답 처리
+    return user
+```
+#### 역할별로 분리 - 3티어 아키텍쳐의 시작
+**3티어(3-Layer) 아키텍처**는 코드를 역할에 따라 3개 층으로 나누는 패턴입니다.
+
+```
+비유: 식당의 역할 분담
+
+  손님(클라이언트) → 홀 직원(Router) → 주방장(Service) → 냉장고(Repository) → DB
+
+  홀 직원: 주문을 받고, 요리를 전달 (요청/응답 처리만)
+  주방장:  레시피대로 요리 (비즈니스 로직)
+  냉장고:  재료 보관/꺼내기 (데이터 저장/조회)
+
+  → 각자 자기 역할만 하고, 다른 역할에 간섭하지 않음!
+```
+```
+요청 흐름:
+
+[클라이언트]
+    │  POST /api/v1/users { name, email, password }
+    ▼
+[Router]  router.py
+    │  "요청 받았다, 서비스한테 넘기자"
+    │  return user_service.create_user(request)
+    ▼
+[Service]  service.py
+    │  "이메일 중복인지 확인하고, 유저를 만들자"
+    │  if repo.find_by_email(email): 에러!
+    │  return repo.save(user)
+    ▼
+[Repository]  repository.py
+    │  "DB에 저장하고 결과를 돌려주자"
+    │  db.add(user) → db.commit() → db.refresh(user)
+    ▼
+[DB]
+```
+#### 추가 지식들
+##### 파이썬 클래스 설명
+클래스
+- 비슷한 데이터와 기능을 하나로 묶어서 관리하려고 쓰는 것
+- 설계도 틀 예) 붕어빵 틀
+객체
+- 그 설계도로 실제로 만든 것 예) 실제로 만들어진 붕어빵
+
+클래스 문법
+```python
+class Person:
+    def __init__(self, name, age):
+        self.name = name
+        self.age = age
+
+    def introduce(self):
+        print(f"안녕하세요. 제 이름은 {self.name}이고, 나이는 {self.age}살입니다.")
+```
+- `__init__` 생성자: 객체를 만들 때 자동으로 실행되는 함수
+- 사용법
+```python
+p1 = Person("철수", 20)
+p2 = Person("영희", 22)
+
+print(p1.name)
+print(p2.age)
+
+p1.introduce()
+p2.introduce()
+```
+#### 코드 다시 헷갈리는 부분 설명
+```python
+@router.post("", response_model=PostResponse, status_code=201)
+def create_post(user_in: PostCreate, db: Session = Depends(get_db)):
+  post = Post(
+    title = user_in.title,
+    content = user_in.content,
+    writer = user_in.writer,
+  )
+  db.add(post)
+  db.commit()
+  db.refresh(post)
+  return post
+```
+여기서
+```python
+post = Post(
+    title = user_in.title,
+    content = user_in.content,
+    writer = user_in.writer,
+  )
+```
+- 요청으로 받은 데이터를 ORM 모델 객체(Post)로 만드는 것
+    - 여기 post 기능에서 클라이언트의 정보를 내가 쓰는 db로 넣으려는 준비
+    - 즉, ORM 객체로 변환하는 단계
+- 비즈니스 로직은 아닌데 위치상 service에 넣기
+
+#### Repository: DB 접근만 담당
+- db에 저장, 삭제 정보를 클래스로 작성함
+- Repository는 **"어떻게 저장하는가"** 만 알고, **"왜 저장하는가"** (비즈니스 이유)는 모릅니다.
+
+예시 코드)
+```python
+# app/user/repository.py
+
+from sqlalchemy.orm import Session
+from app.user.model import User
+
+
+class UserRepository:
+    def __init__(self, db: Session):
+        self.db = db
+
+    def find_by_id(self, user_id: int) -> User | None:
+        return self.db.query(User).filter(User.id == user_id).first()
+
+    def find_by_email(self, email: str) -> User | None:
+        return self.db.query(User).filter(User.email == email).first()
+
+    def find_all(self) -> list[User]:
+        return self.db.query(User).all()
+
+    def save(self, user: User) -> User:
+        self.db.add(user)
+        self.db.commit()
+        self.db.refresh(user)
+        return user
+
+    def delete(self, user: User) -> None:
+        self.db.delete(user)
+        self.db.commit()
+```
+repository- `db:Session` vs router- `db:Session = Depends(get_db)`
+- 흐름
+```
+[클라이언트 요청]
+        ↓
+Router 실행 (FastAPI가 관리)
+        ↓
+Depends(get_db) 실행 → DB Session 생성
+        ↓
+db가 Router 함수에 전달됨
+        ↓
+Service로 전달
+        ↓
+Repository로 전달
+        ↓
+DB 사용
+```
+- 결론
+    1. Router에서 Depends(get_db)로 DB 세션을 “한 번 생성”
+    2. 그걸 Service → Repository로 계속 전달해서 재사용하는 구조
+
+##### 항상 궁금했던 거! Session이란?
+- DB와 대화하는 창구 (연결 + 작업 관리자)
+    - 은행 창구 비유
+        - DB = 은행
+        - Session = 창구 직원
+- 흐름
+```
+Session에게 요청 → Session이 DB에 전달 → 결과 받아옴
+```
+- 쿼리를 보내고, 결과를 받고, commit/rollback을 관리하는 객체
+- Session이 하는 일 
+    1. 조회 (SELECT): `db.query(User).all()` DB에서 데이터 가져옴
+    2. 변경 관리 (INSERT / UPDATE / DELETE 준비): `db.add(user)` “이거 저장할 거야”라고 예약
+    3. commit (진짜 DB 반영): `db.commit()` 실제 DB에 반영
+    4. rollback (문제 생기면 취소): `db.rollback()` 작업 취소
+
+- Session이 필요한 이유?
+DB를 직접 건드리는 게 아니라 Session을 통해서만 작업하도록 설계됨
+
+- db 코드
+```python
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+```
+    1. Session 생성
+    2. Router에 전달
+    3. 요청 끝나면 자동 종료
+
+##### 화살표란? 
+이 함수가 어떤 타입을 반환하는지 알려주는 표시
+예)
+```python
+def find_by_id(self, user_id: int) -> User | None:
+```
+뜻: User 객체를 반환하거나 없으면 None을 반환함
+
+##### 클래스에서 사용한 self란?
+self: 이 객체 자기 자신
+- 객체마다 다른 데이터를 가지게 하려고
+
+
+#### Service: 비즈니스 로직 담당
+- Service는 **"무엇을 해야 하는가"** (판단, 검증)를 담당
+- 실제 DB 작업은 Repository에게 시킴
+- 규칙, 조건, 정책이 들어가야 비즈니스 로직임
+
+## 4/16 목 - post_repository 마무리
+
+
+
+#### Router: 

@@ -1063,6 +1063,31 @@ self: 이 객체 자기 자신
 
 ## 4/16 목 - post_repository 마무리
 
+## 4/22 수 - 3티어 아키텍쳐 
 
+### post_service.py 만들기
 
-#### Router: 
+`from app.post.post_schema import PostCreate, PostResponse, PostUpdate`
+`import app.post.post_schema` 이렇게 쓰면 나중에 코드 수정 시 귀찮아짐
+
+## 4/23 목 - 3티어 아키텍쳐
+
+## 4/24 금 - 3티어 아키텍쳐  
+### post_service.py
+- 스키마를 받고 모델을 반환
+```
+[ Router (Controller) ]
+        ↓
+[ Service (여기 코드) ] 
+        ↓
+[ Repository (DB 접근) ]
+        ↓
+[ Database ]
+```
+#### service에서 self.repo를 써야하는 이유?
+왜냐면 service는 DB랑 연결이 안되기 때문에 db랑 연결을 하려면 self.repo라 써서 db를 연결해야됨
+
+#### service에 있는 함수를 쓸때는 self.repo를 안써도 되는 이유?
+안써도 된다기 보다는 이미 service안에 있는 내가 사용하려는 함수가 self.repo를 가진 경우가 있을 수 있음. 또한 함수를 가져올 때 repo를 거치지 않아도 됨. 
+
+### post_router.py

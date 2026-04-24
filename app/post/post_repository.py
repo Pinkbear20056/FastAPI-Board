@@ -18,10 +18,10 @@ class PostRepository:
   def find_all(self) -> list[Post]:
     return self.db.query(Post).all()
   
-  def find_by_id(self, user_id: int) -> Post | None:
-    return self.db.query(Post).filter(Post.id == id).first()
+  def find_by_id(self, post_id: int) -> Post | None:
+    return self.db.query(Post).filter(Post.id == post_id).first()
 
   # delete
   def delete(self, post: Post) -> None:
     self.db.delete(post)
-    self.db.commit
+    self.db.commit()

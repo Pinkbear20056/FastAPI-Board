@@ -1154,3 +1154,33 @@ def create_user(request: UserCreate, user_service: UserService = Depends(get_use
 - `user_service: UserService = Depends(get_user_service)`: get_user_service() 실행해서
 UserService 객체를 만들어서
 user_service에 넣어줘
+
+### 테스트 / 디버깅
+에러: AttributeError: 'PostService' object has no attribute 'title'
+```python
+def create_post(self, request: PostCreate) -> Post: 
+    post = Post(
+      title = self.title,
+      content = self.content,
+      writer = self.writer,
+    )
+    return self.repo.save(post)
+```
+
+이렇게 하면 안되는 이유는 PostService안에서 title, content, writer 값을 꺼내서 post를 만들겠다인데 ... PostService에는 보통 title, content, writer가 없음. 
+=> request에서 꺼내야함.
+
+```python
+def create_post(self, request: PostCreate) -> Post: 
+    post = Post(
+      title = request.title,
+      content = request.content,
+      writer = request.writer,
+    )
+    return self.repo.save(post)
+```
+
+그외 service의 repo 참조하지 않아서 몇가지...
+
+CRUD 전부 테스트 완료
+- 끝! -

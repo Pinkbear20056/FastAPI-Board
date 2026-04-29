@@ -12,7 +12,7 @@ from app.context import trace_id_ctx, TraceIdFilter
 from app.database import engine, Base
 from app.auth.auth_router import router as auth_router
 from app.user.user_router import router as user_router
-from app.post.post_without_arch import router as post_router
+from app.post.post_router import router as post_router
 
 logger = logging.getLogger("uvicorn")
 

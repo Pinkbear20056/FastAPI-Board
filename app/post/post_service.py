@@ -9,9 +9,9 @@ class PostService:
 
   def create_post(self, request: PostCreate) -> Post: 
     post = Post(
-      title = self.title,
-      content = self.content,
-      writer = self.writer,
+      title = request.title,
+      content = request.content,
+      writer = request.writer,
     )
     return self.repo.save(post)
   
@@ -26,13 +26,13 @@ class PostService:
     
   def update_post(self, post_id: int, request: PostUpdate) -> Post:
     post = self.get_post(post_id)
-    if request.name is not None:
-        post.name = request.name
-    if request.email is not None:
-        post.email = request.email
+    if request.title is not None:
+        post.title = request.title
+    if request.content is not None:
+        post.content = request.content
     return self.repo.save(post)
 
   def delete_post(self, post_id: int) -> None:
-    post = self.find_by_id(post_id)
+    post = self.repo.find_by_id(post_id)
     self.repo.delete(post)
 

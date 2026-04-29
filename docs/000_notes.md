@@ -1091,3 +1091,66 @@ self: 이 객체 자기 자신
 안써도 된다기 보다는 이미 service안에 있는 내가 사용하려는 함수가 self.repo를 가진 경우가 있을 수 있음. 또한 함수를 가져올 때 repo를 거치지 않아도 됨. 
 
 ### post_router.py
+라우터의 역할: 클라이언트에게서 요청을 받아서 URL과 HTTP method에 맞는 Service 로직을 연결하고 요청/응답 데이터를 변환
+- DB를 직접 다루지 않음.
+- 예시
+```python
+@router.post("", response_model=UserResponse, status_code=201)
+def create_user(request: UserCreate, user_service: UserService = Depends(get_user_service)):
+    return user_service.create_user(request)
+
+@router.get("/{user_id}", response_model=UserResponse)
+def get_user(user_id: int, user_service: UserService = Depends(get_user_service)):
+    return user_service.get_user(user_id)
+```
+
+1. URL & Method 매핑: 어떤 요청이 어떤 함수로 갈지 결정
+```python
+@router.get("/{user_id}")
+@router.post("")
+```
+2. 요청 데이터 받기: JSON / URL 값을 Python 객체로 변환
+```python
+request: UserCreate
+user_id: int
+```
+3. Service 연결: Service 객체 생성해서 함수에 넣어줌
+```python
+user_service: UserService = Depends(get_user_service)
+```
+4. 응답 변환: Model → 클라이언트용 데이터로 변환
+```python
+response_model=UserResponse
+```
+## 4/29 수 - 3티어 아키텍쳐
+
+#### 이때 `Depends`를 쓰는 이유?
+`Depends` = “이 함수 실행해서 결과를 넣어줘”
+예
+```python
+user_service: UserService = Depends(get_user_service)
+```
+의미: get_user_service() 실행해서
+그 결과(UserService)를 user_service에 넣어줘
+
+```python
+def get_user_service(db: Session = Depends(get_db)) -> UserService:
+    """DB 세션 → Repository → Service 순서로 조립하여 전달"""
+    return UserService(UserRepository(db))
+
+
+@router.post("", response_model=UserResponse, status_code=201)
+def create_user(request: UserCreate, user_service: UserService = Depends(get_user_service)):
+    return user_service.create_user(request)
+```
+`return UserService(UserRepository(db))` 
+1. db가 클래스 안에 저장됨
+2. db를 가진 repository 객체를 생성
+=> 객체 생성할 때 db 넣음 → 이후 모든 함수에서 self.db로 사용
+(X) 함수 호출할 때마다 db 넣음 <- 아님
+
+`def create_user(request: UserCreate, user_service: UserService = Depends(get_user_service)):`
+- Depends: 이 함수(또는 클래스)를 실행해서 나온 객체를 넣어줘
+- `user_service: UserService = Depends(get_user_service)`: get_user_service() 실행해서
+UserService 객체를 만들어서
+user_service에 넣어줘
